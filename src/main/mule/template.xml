@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:http-policy="http://www.mulesoft.org/schema/mule/http-policy"
+	xmlns:http-transform="http://www.mulesoft.org/schema/mule/http-policy-transform"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+               http://www.mulesoft.org/schema/mule/http-policy http://www.mulesoft.org/schema/mule/http-policy/current/mule-http-policy.xsd
+               http://www.mulesoft.org/schema/mule/http-policy-transform http://www.mulesoft.org/schema/mule/http-policy-transform/current/mule-http-policy-transform.xsd">
+
+
+
+
+	<!-- Database configuration 1 -->
+	<db:config name="Database_Config" doc:name="Database Config"
+		doc:id="cac5ad4e-0c54-46b0-9296-2de0000426ba">
+		<db:my-sql-connection
+			host="HOST" port="PORT" user="USERNAME"
+			password="PASSWORD" database="DB NAME" />
+	</db:config>
+
+
+	<http-policy:proxy
+		name="{{{policyId}}}-custom-policy">
+		<http-policy:source>
+			<try>
+				<logger level="INFO" doc:name="Logger"
+					doc:id="b67f4dbe-23cb-444b-bd6a-a8913dfe7dec"
+					message='#["Request received"]' />
+				
+
+
+				<ee:transform doc:name="Transform Message"
+					doc:id="29e6de3a-7e5a-4a43-a0c5-e5c80f47d58a">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"payload": write(payload, "application/json")  as String default "",
+	"header": write((attributes.headers), "application/json")  as String default "",
+	"queryparams":write((attributes.queryParams), "application/json")  as String default "" 
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+
+				<db:insert doc:name="Insert"
+					doc:id="e09e8148-f408-4f70-b04f-a69520423425"
+					config-ref="Database_Config">
+					<db:sql><![CDATA[INSERT INTO `requestdetails` (`payload`, `header`, `queryparams`) VALUES (:payload, :header, :queryparams)]]></db:sql>
+					<db:input-parameters><![CDATA[#[%dw 2.0
+output application/java
+---
+{
+	"payload": payload.payload,
+	"header": payload.header,
+	"queryparams": payload.queryparams
+}]]]></db:input-parameters>
+				</db:insert>
+
+				<logger level="INFO" doc:name="Logger"
+					doc:id="597e7f61-90e4-4872-a0c0-c2ad777b5046"
+					message='#[output application/json --- payload]' />
+				<logger level="INFO" doc:name="Logger"
+					doc:id="6a52d1d2-f69a-4605-a6ea-84d1ba1fed11"
+					message='#["Request Ended"]' />
+
+
+
+				<error-handler name="Global_Error_Handler">
+					<on-error-propagate logException="true">
+						<set-payload
+							value='#[output application/json --- {"error": "$(error.description)"}]' />
+						<set-variable variableName="httpStatus" value="500" />
+					</on-error-propagate>
+				</error-handler>
+			</try>
+
+			<http-policy:execute-next />
+
+
+
+		</http-policy:source>
+	</http-policy:proxy>
+</mule>

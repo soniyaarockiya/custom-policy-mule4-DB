@@ -1,0 +1,11 @@
+id: capture-request
+name: capture-request
+description: Save request in Databse
+category: Custom
+type: custom
+resourceLevelSupported: true
+encryptionSupported: false
+standalone: true
+requiredCharacteristics: []
+providedCharacteristics: []
+configuration: []
